@@ -1,5 +1,6 @@
 package pt.eden.raspjsoup;
 
+import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -9,12 +10,11 @@ import us.codecraft.xsoup.Xsoup;
 import javax.net.ssl.HttpsURLConnection;
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
 import java.net.CookieHandler;
 import java.net.CookieManager;
 import java.net.URL;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
@@ -22,7 +22,7 @@ import java.util.Scanner;
 /**
  * @author : trsimoes
  */
-public class MainApp {
+public class SantanderApp {
 
     private List<String> cookies;
 
@@ -32,29 +32,34 @@ public class MainApp {
 
     public static void main(String[] args) throws Exception {
 
-        Scanner scan= new Scanner(System.in);
+        Scanner scan = new Scanner(System.in);
         System.out.print("Username: ");
-        String username= scan.nextLine();
+        String username = scan.nextLine();
         System.out.print("Password: ");
-        String password= scan.nextLine();
+        String password = scan.nextLine();
 
-        String loginPage = "https://www.myedenred.pt/euroticket/pages/login.jsf";
-        String homePage = "https://www.myedenred.pt/euroticket/pages/private/customer/customer.jsf";
+//        String username = null;
+//        String password = null;
 
-        MainApp http = new MainApp();
+        String loginPage = "https://www.particulares.santandertotta.pt/bepp/sanpt/usuarios/login/?";
+        String homePage =
+                "https://www.particulares.santandertotta.pt/bepp/sanpt/cuentas/listadomovimientoscuenta/0,,,0.shtml?trxId=201803180025635064";
+
+        SantanderApp http = new SantanderApp();
 
         // make sure cookies is turn on
         CookieHandler.setDefault(new CookieManager());
 
         // 1. Send a "GET" request, so that you can extract the form's data.
         String page = http.GetPageContent(loginPage);
+        System.out.println(page);
+        //System.exit(0);
         String postParams = http.getFormParams(page, username, password);
         http.sendPost(loginPage, postParams);
 
         String result = http.GetPageContent(homePage);
         Document doc = Jsoup.parse(result);
-        String elementRaw = Xsoup.compile(
-                "/html/body/table[1]/tbody/tr[3]/td/div/table/tbody/tr[2]/td[1]/table/tbody/tr/td[2]").evaluate(doc)
+        String elementRaw = Xsoup.compile("/html/body/form[3]/div[7]/div[2]/table/tbody/tr/td[4]/span").evaluate(doc)
                 .get();
         System.out.println(elementRaw);
 
@@ -68,7 +73,7 @@ public class MainApp {
         // Acts like a browser
         conn.setUseCaches(false);
         conn.setRequestMethod("POST");
-        conn.setRequestProperty("Host", "www.myedenred.pt:443");
+        conn.setRequestProperty("Host", "www.particulares.santandertotta.pt:443");
         conn.setRequestProperty("User-Agent", USER_AGENT);
         conn.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
         conn.setRequestProperty("Accept-Language", "en-US,en;q=0.5");
@@ -76,7 +81,7 @@ public class MainApp {
             conn.addRequestProperty("Cookie", cookie.split(";", 1)[0]);
         }
         conn.setRequestProperty("Connection", "keep-alive");
-        conn.setRequestProperty("Referer", "https://www.myedenred.pt/euroticket/pages/login.jsf");
+        conn.setRequestProperty("Referer", "https://www.particulares.santa…pt/bepp/sanpt/usuarios/login/?");
         conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
         conn.setRequestProperty("Content-Length", Integer.toString(postParams.length()));
 
@@ -117,9 +122,13 @@ public class MainApp {
         conn.setUseCaches(false);
 
         // act like a browser
-        conn.setRequestProperty("User-Agent", USER_AGENT);
-        conn.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-        conn.setRequestProperty("Accept-Language", "en-US,en;q=0.5");
+        conn.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/");
+//        conn.setRequestProperty("Accept-Encoding", "gzip, deflate, br");
+        conn.setRequestProperty("Accept-Language", "pt-PT,pt;q=0.8,en;q=0.5,en-US;q=0.3");
+        conn.setRequestProperty("Connection", "keep-alive");
+        conn.setRequestProperty("Host", "www.particulares.santandertotta.pt");
+        conn.setRequestProperty("Upgrade-Insecure-Requests", "1");
+        conn.setRequestProperty("User-Agent", "Mozilla/5.0");
         if (cookies != null) {
             for (String cookie : this.cookies) {
                 conn.addRequestProperty("Cookie", cookie.split(";", 1)[0]);
@@ -149,26 +158,34 @@ public class MainApp {
         this.cookies = cookies;
     }
 
-    private String getFormParams(String html, String username, String password) throws UnsupportedEncodingException {
+    private String getFormParams(String html, String username, String password) throws IOException {
 
         System.out.println("Extracting form's data...");
 
         Document doc = Jsoup.parse(html);
 
         // Google form id
-        Element loginform = doc.getElementById("loginform");
+        Element loginform = doc.getElementsByTag("form").get(0);
         Elements inputElements = loginform.getElementsByTag("input");
         List<String> paramList = new ArrayList<String>();
         for (Element inputElement : inputElements) {
             String key = inputElement.attr("name");
             String value = inputElement.attr("value");
 
-            if (key.equals("loginform:username"))
+            if (key.equals("identificacionUsuario"))
                 value = username;
-            else if (key.equals("loginform:password"))
+            else if (key.equals("claveConsultiva"))
                 value = password;
-            paramList.add(key + "=" + URLEncoder.encode(value, "UTF-8"));
+            //paramList.add(key + "=" + URLEncoder.encode(value, "UTF-8"));
+            paramList.add(key + "=" + value);
         }
+
+        final Connection connect = Jsoup.connect("https://www.particulares.santandertotta.pt/nbp_guard");
+        connect.header("FETCH-CSRF-TOKEN", "1");
+        final Document post = connect.post();
+        String token = post.body().html();
+        final String[] split = token.split(":");
+        paramList.add(split[0] + "=" + split[1]);
 
         // build parameters list
         StringBuilder result = new StringBuilder();
